@@ -16,9 +16,11 @@
 #include <sys/user.h>
 #include <sys/wait.h>
 
-#include <rlgl.h>
-#include <glad.h>
 #include <raylib.h>
+#include <raymath.h>
+#include <rlgl.h>
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
 #define RAYGUI_IMPLEMENTATION
 #include "deps/raygui.h"
 
@@ -248,7 +250,7 @@ int main(int argc, char** argv) {
 				// Draw map and highlight selected range
 				BeginShaderMode(mapShader);
 					Vector4 selectedColor = ColorNormalize(selectedRangeColor);
-					SetShaderValue(mapShader, selectedColorLoc, &selectedColor, UNIFORM_VEC4);
+					SetShaderValue(mapShader, selectedColorLoc, &selectedColor, SHADER_UNIFORM_VEC4);
 					DrawTexture(mapTexture, 0, 0, BLANK);
 				EndShaderMode();
 				
@@ -284,11 +286,11 @@ int main(int argc, char** argv) {
 					}
 				}
 				
-				rlglDraw();
+				rlDrawRenderBatchActive();
 				glUseProgram(traces.particleShader.id);
 					// Have to set the model view projection matrix manually because raylib has not matrix uniform type
-					Matrix mvp = MatrixMultiply(GetMatrixModelview(), GetMatrixProjection());
-					glUniformMatrix4fv(traces.particleShader.locs[LOC_MATRIX_MVP], 1, false, MatrixToFloat(mvp));
+					Matrix mvp = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+					glUniformMatrix4fv(traces.particleShader.locs[RL_SHADER_LOC_MATRIX_MVP], 1, false, MatrixToFloat(mvp));
 					glUniform1ui(traces.shaderCurrentTimeLocation, traces.currentTime);
 					
 					for (size_t t = 0; t < traces.taskCount; t++) {
@@ -296,7 +298,7 @@ int main(int argc, char** argv) {
 							Color transparentColor = traces.tasks[t].color;
 							transparentColor.a = 64;
 							Vector4 color = ColorNormalize(transparentColor);
-							SetShaderValue(traces.particleShader, traces.shaderColorLocation, &color, UNIFORM_VEC4);
+							SetShaderValue(traces.particleShader, traces.shaderColorLocation, &color, SHADER_UNIFORM_VEC4);
 							glBindVertexArray(traces.tasks[t].particleVAO);
 								glDrawArrays(GL_POINTS, 0, particleCount);
 							glBindVertexArray(0);
@@ -320,7 +322,7 @@ int main(int argc, char** argv) {
 			
 			GuiEnable();
 			Rectangle tasksPanel = (Rectangle){ screenWidth - 200, 20, 200, screenHeight };
-			GuiPanel(tasksPanel);
+			GuiPanel(tasksPanel, "tasks");
 			float x = 5, y = 5;
 			for (ssize_t t = 0; t < (ssize_t)traces.taskCount; t++) {
 				if (traces.focusedTaskIndex == -1 || t == traces.focusedTaskIndex) {
@@ -360,13 +362,13 @@ int main(int argc, char** argv) {
 }
 
 Font LoadSdfFont(const char* fileName) {
-	uint32_t fontFileSize = 0;
+	int32_t fontFileSize = 0;
 	uint8_t* fontFileData = LoadFileData(fileName, &fontFileSize);
-		Font font = { .baseSize = 32, .charsCount = 95 };
-		font.chars = LoadFontData(fontFileData, fontFileSize, font.baseSize, NULL, 0, FONT_SDF);
-		Image atlas = GenImageFontAtlas(font.chars, &font.recs, font.charsCount, font.baseSize, 0, 1);
+		Font font = { .baseSize = 32, .glyphCount = 95 };
+		font.glyphs = LoadFontData(fontFileData, fontFileSize, font.baseSize, NULL, 0, FONT_SDF);
+		Image atlas = GenImageFontAtlas(font.glyphs, &font.recs, font.glyphCount, font.baseSize, 0, 1);
 			font.texture = LoadTextureFromImage(atlas);
-			SetTextureFilter(font.texture, FILTER_BILINEAR);
+			SetTextureFilter(font.texture, ICON_FILTER_BILINEAR);
 		UnloadImage(atlas);
 	UnloadFileData(fontFileData);
 	return font;
